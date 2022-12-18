@@ -18,12 +18,16 @@
 #include <unistd.h>
 
 const long long noRaiz = 0; //por padrão o nó raiz se encontrará no início do arquivo de índice
+const int N = (TAM - sizeof(folhaDisco)) / sizeof(registro); // quantidade de registros em uma folha
+
+int fd_Dados = -1; // armazena o file descriptor do arquivo que contém os dados 
+int fd_Indice = -1; // armazena o file descriptor do arquivo que contém o índice
+
+noMemoria *raiz = NULL; // ponteiro para a raiza da árvore B+
 
 int main()
 {
     int fd = 0;
-    int fd_Dados = -1; // armazena o file descriptor do arquivo que contém os dados 
-    int fd_Indice = -1; // armazena o file descriptor do arquivo que contém o índice
     short int op = 0, op1 = 0; // usados para entrada da escolha do usuário
     char nome1[31], nome2[31]; // nome do arquivo de dados e do arquivo de índice, respectivamente.
 
@@ -34,7 +38,7 @@ int main()
         printf(" 3 - Operar sobre índice carregado/criado.\n");
         printf(" 4 - Encerrar.\n");
 
-        scanf("%d",&op);
+        scanf("%hd",&op);
 
         switch(op)
         {
@@ -67,12 +71,12 @@ int main()
                     printf(" \t2 - Alternativa 3 em TEXT\n");
                     printf(" \t3 - Sair.\n");
 
-                    scanf("%d",&op1);
+                    scanf("%hd",&op1);
 
                     switch(op1)
                     {
                         case 1:
-                            if( (fd = converterArquivo(fd_Dados)) >= 0)
+                            if( (fd = converterArquivo()) >= 0)
                             {
                                 rename("temp.txt",nome1);
                                 fd_Dados = fd;
@@ -176,13 +180,14 @@ noMemoria *alocarNo()
     {
         novo->noAlterado = false;
         novo->pai = NULL;
-        novo->filhos = (noMemoria **) calloc(N, sizeof(noMemoria *));
+        novo->filhos = (void **) calloc(N, sizeof(void *)); // talvez seja melhor alocar apenas a quantidade que existe 
+        novo->conteudo = NULL;
     }
 
     return novo;
 }
 
-folhaMemoria *alocarFolha1()
+folhaMemoria *alocarFolha()
 {
     folhaMemoria *novo = (folhaMemoria *) calloc(1,sizeof(folhaMemoria));
 
@@ -192,6 +197,7 @@ folhaMemoria *alocarFolha1()
         novo->pai = NULL;
         novo->ant = NULL;
         novo->prox = NULL;
+        novo->conteudo = NULL;
     }
 
     return novo;
@@ -206,7 +212,7 @@ folhaMemoria *alocarFolha1()
  * Saída: -2, para arquivo já convertido, -1, para falha na criação de arquivo temporário, ou um inteiro não 
  *            negativo, indicando o file descritor do arquivo criado
 */
-int converterArquivo(int fd_Dados)
+int converterArquivo()
 {
     int indicador = 0;
     folhaDisco f;
@@ -256,8 +262,9 @@ int converterArquivo(int fd_Dados)
 /**
  * bulkloading
  * ------------
- * Entrada: 
- * Processo: 
+ * Entrada: inteiro, indicando o file descriptor do arquivo de dados
+ *          inteiro, indicando o file descriptor do arquivo de índice
+ * Processo: Realiza a operação de bulkloading 
  * Saída: 
 */
 int bulkloading(int fd_Dados, int fd_Indice)
@@ -265,6 +272,166 @@ int bulkloading(int fd_Dados, int fd_Indice)
 
 }
 
+/**
+ * inserirFolha
+ * -------------
+ * Entrada:
+ * Processo:
+ * Saída: 0, para falha, 1, para sucesso
+*/
+int inserirFolha(registro r)
+{
+    // sugestão de deixar a raiz já carregada na memória, pelo menos
+    
+    int chave = 0;
+
+    if(raiz == NULL)
+    {
+        raiz = alocarNo();
+        if(raiz == 0)
+            return 0;
+            
+        lseek(fd_Indice, 0, SEEK_SET);
+        read(fd_Indice, raiz->conteudo, TAM);
+    }
+
+    noMemoria *aux = raiz;
+
+    do
+    {
+        if(aux->no.filhosSaoFolha)
+        {
+            // filhos são folhas
+        }
+        else
+        {
+            int i;
+            for(i = 0; i < aux->no.ocupacao; i++)
+            {
+                memcpy(&chave, aux->conteudo + sizeof(int) + (2 * sizeof(int)) * i, sizeof(int));
+                
+                if(r.nseq < chave)
+                {
+                    //vai para o nó da esquerda
+
+                    if(aux->filhos[i] == NULL)
+                    {
+                        // o nó não foi carregado na memória ainda
+                        if(carregarNo(aux,i) == 0)
+                            return 0;
+                    }
+
+                    break;
+                }
+            }
+
+            if(i == aux->no.ocupacao)
+            {
+                // segue o ponteiro do nó mais a direita
+
+                if(aux->filhos[i] == NULL)
+                {
+                    // 
+                }
+                else
+                {
+
+                }
+            }
+
+            aux = aux->filhos[i];
+        }
+    }while(1);
+    
+}
+
+
+/**
+ * carregarNo
+ * -----------
+ * Entrada: ponteiro para estrutura noMemoria
+ *          inteiro, indicando qual filho deve ser carregado na memória
+ * Processo: Carrega o nó filho especifica por i do disco para a memória
+ * Saída: 0, em falha, 1, em sucesso
+*/
+int carregarNo(noMemoria *m, int i)
+{
+    int pagina = 0;
+
+    memcpy(&pagina, m->conteudo + (2 * sizeof(int)) * i, sizeof(int));
+    
+    noMemoria *novo = alocarNo();
+    if(novo == 0)
+        return 0;
+            
+    lseek(fd_Indice, pagina * TAM, SEEK_SET);
+    read(fd_Indice, novo->conteudo, TAM);
+
+    m->filhos[i] = novo;
+    novo->pai = m;
+
+    return 1;
+}
+
+
+
+
+
+
+
+/*
+    funções:
+        splitFolha
+        splitNo
+        redistribuicaoFolha
+        redistribuicaoNo
+
+
+*/
+
+/**
+ * redistribuicaoInserçãoFolha
+ * --------------------
+ * Entrada:
+ * Processo:
+ * Saída:
+*/
+int redistribuicaoInserçãoFolha(folhaMemoria *f, registro r)
+{
+    // tenta redistribuir à esquerda primeiro
+
+    // verifica a folha a esquerda. Se ela não estiver cheia, faz a redistribuição
+    // se não for possível tenta com a direita.
+        // em ambos os casos verifica-se se o pai de ambas folhas é o mesmo
+    // em caso de sucesso, é necessário alterar as entradas no pai
+}
+
+
+// houve tentativa de inserção em uma folha que estava cheia e a redistribuição falhou
+/**
+ * splitFolha
+ * -----------
+ * Entrada:
+ * Processo:
+ * Saída: 
+*/
+int splitFolha(folhaMemoria *f, registro r)
+{
+    // faz o split
+    // atualiza o pai, e se necessario chama splitNo ou redistribuicaoNo
+}
+
+/**
+ * splitNo
+ * ----------
+ * Entrada:
+ * Processo:
+ * Saída: 
+*/
+int splitNo(noMemoria *m, int entrada)
+{
+
+}
 
 /*
     Páginas para o arquivo de dados.

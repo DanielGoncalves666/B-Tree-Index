@@ -11,7 +11,7 @@
 
 const double OCUPACAO = 0.5; // ocupação das folhas à princípio
 const int TAM = 512; // tamanho das páginas
-const int INDICADOR = 02658093618; // indica que o arquivo ja foi convertido 
+const int INDICADOR = 2658093618; // indica que o arquivo ja foi convertido 
 
 // ================ Estruturas Gerais ================ //
 
@@ -22,8 +22,6 @@ typedef struct{
     int nseq;
     char text[46]; // textos de até 45 caracteres
 }registro;
-
-const int N = (TAM - sizeof(folhaDisco)) / sizeof(registro); // quantidade de registros em uma folha
 
 /**
  * Estrutura para o Rid
@@ -59,20 +57,17 @@ typedef struct{
     bool filhosSaoFolha;
     int ocupacao;
     int pai;
-
-    int ponteiros[N + 1]; // posição do arquivo onde a estrutura do nó em disco começa
-    int chaves[N]; // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                    // N registros, cabe mais chaves nos nós
-}noDisco;
+}noDisco; // ponteiros e chaves armazenados separadamente na página
 
 /**
  * Estrutura nó para manipulação em memória
 */
-typedef struct{
+typedef struct noMemoria{
     noDisco no;
+    void *conteudo;
     bool noAlterado;
 
-    noMemoria *pai;
+    struct noMemoria *pai;
     void **filhos;
 }noMemoria;
 
@@ -91,9 +86,11 @@ typedef struct{
 */
 typedef struct{
     folhaDisco folha;
-    registro *todos;
+    void *conteudo;
     bool folhaAlterada;
 
     noMemoria *pai;
     folhaDisco *ant, *prox;
 }folhaMemoria;
+
+#endif
