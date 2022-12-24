@@ -7,6 +7,7 @@
 
 #include<stdlib.h>
 #include<stdbool.h>
+#include"arvoreBmais.h"
 #include"bufferpool.h"
 
 // Bibliotecas requeridas pelas system calls
@@ -141,14 +142,14 @@ int persistirFrame(bufferpool *b, int i)
 {
     if(b == NULL || i < 0 || i >= b->length)
         return 0;
-
+        
     pTE aux = b->pageTable[i];
-    if( lseek(aux.p.fd, aux.p.pid * PAGE_SIZE, SEEK_SET) == -1) // coloca o apontador do arquivo no ínicio da página
+    if( lseek64(aux.p.fd, aux.p.pid * PAGE_SIZE, SEEK_SET) == -1) // coloca o apontador do arquivo no ínicio da página
         return 0;
     if( write(aux.p.fd, &(b->frames[i]), PAGE_SIZE) == -1) // sobreescreve as mudanças em disco
         return 0;
     
-    b->bufferTable[i].dirty_bit = false;
+    desativarDirtyBit(b,i);
     cortarPilha(b,i);
     push(b,i);
 
@@ -224,13 +225,15 @@ int cortarPilha(bufferpool *b, int frame)
  * carregarPagina
  * ---------------
  * Entrada: ponteiro para estrutura bufferpool
- *          estrutura pageID, indicando qual página de qual arquivo deve ser carregada
+ *          inteiro, indicando o file descriptor do arquivo
+ *          inteiro, indicando a página
  * Processo: Verifica se a página do arquivo solicitado já está no bufferpool, carregando ela e substituindo um frame utilizando MRU caso não
  *           seja o caso. 
  * Saída: -1, em falha, inteiro não negativo em sucesso, indicando o frame
 */
-int carregarPagina(bufferpool *b, pageID p)
+int carregarPagina(bufferpool *b, int fd, int pid)
 {
+    pageID p = {fd,pid};
     pageID aux;
 
     for(int i = 0; i < b->length; i++)
@@ -238,7 +241,7 @@ int carregarPagina(bufferpool *b, pageID p)
         aux = b->pageTable[i].p;
         if(aux.fd == p.fd && aux.pid == p.pid) // página já carregada no bufferpool
         {
-            b->bufferTable[i].pin_count++;
+            incrementarPinCount(b,i);
             return i;
         }
     }
@@ -251,17 +254,91 @@ int carregarPagina(bufferpool *b, pageID p)
     if(b->bufferTable[retorno].dirty_bit)
         persistirFrame(b, retorno);
     
-    lseek(p.fd, p.pid * PAGE_SIZE, SEEK_SET);
+    lseek64(p.fd, p.pid * PAGE_SIZE, SEEK_SET);
     read(p.fd, b->frames[retorno], sizeof(PAGE_SIZE));
     b->pageTable[retorno].p = p;
 
-    bTE att = {retorno, false, 1};
-    b->bufferTable[retorno] = att;
+    desativarDirtyBit(b,retorno); // redundante
+    incrementarPinCount(b,retorno); // se chegou até aqui então retorno tinha pin_count = 0
 
     cortarPilha(b,retorno);
 
     return retorno;
 }
+
+/**
+ * obterFrame
+ * -----------
+ * Entrada: ponteiro para estrutura bufferpool
+ *          inteiro, indicando o frame que se quer obter
+ * Processo: Acessa os frames do bufferpool e dá acesso ao frame especificado
+ * Saída: ponteiro genérico
+*/
+void *obterFrame(bufferpool *b, int i)
+{
+    return b->frames[i];
+}
+
+/**
+ * ativarDirtyBit
+ * ---------------
+ * Entrada: ponteiro para estrutura bufferpool
+ *          inteiro, indicando o frame que se quer ativar o dirty_bit
+ * Processo: Ativa o dirty_bit do frame indicado
+ * Saída: nada
+*/
+void ativarDirtyBit(bufferpool *b, int i)
+{
+    b->bufferTable[i].dirty_bit = true;
+}
+
+/**
+ * desativarDirtyBit
+ * ---------------
+ * Entrada: ponteiro para estrutura bufferpool
+ *          inteiro, indicando o frame que se quer desativar o dirty_bit
+ * Processo: Ativa o dirty_bit do frame indicado
+ * Saída: nada
+*/
+void desativarDirtyBit(bufferpool *b, int i)
+{
+    b->bufferTable[i].dirty_bit = false;
+}
+
+
+/**
+ * incrementarPinCount
+ * --------------------
+ * Entrada: ponteiro para estrutura bufferpool
+ *          inteiro, indicando um frame
+ * Processo: Incrementa o pin_count do frame indicado
+ * Saída: nenhuma
+*/
+void incrementarPinCount(bufferpool *b, int i)
+{
+    // incrementa quando carrega a pagina, obrigatoriamente
+    int aux = ++(b->bufferTable[i].pin_count);
+    if(aux == 1)
+        cortarPilha(b,i);
+}
+
+/**
+ * decrementarPinCount
+ * --------------------
+ * Entrada: ponteiro para estrutura bufferpool
+ *          inteiro, indicando um frame
+ * Processo: decrementa o pin_count do frame indicado
+ * Saída: nenhuma
+*/
+void decrementarPinCount(bufferpool *b, int i)
+{
+    // o decremento é de responsabilidade do usuário
+    int aux = --(b->bufferTable[i].pin_count);
+    if(aux == 0)
+        push(b,i);
+}
+
+
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // no processo de abortagem, tem que garantir a integridade da operação

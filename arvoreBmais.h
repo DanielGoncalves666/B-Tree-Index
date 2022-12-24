@@ -7,11 +7,20 @@
 #ifndef __ARVORE_B_MAIS_H
 #define __ARVORE_B_MAIS_H
 
+#define _LARGEFILE64_SOURCE   // para usar lseek64
+
+// Bibliotecas requeridas pelas system calls
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+#include<stdlib.h>
+#include<string.h>
 #include<stdbool.h>
+#include"bufferpool.h"
 
 const double OCUPACAO = 0.5; // ocupação das folhas à princípio
-const int TAM = 512; // tamanho das páginas
-const int INDICADOR = 2658093618; // indica que o arquivo ja foi convertido 
 
 // ================ Estruturas Gerais ================ //
 
@@ -32,21 +41,15 @@ typedef struct{
 }rid;
 
 /**
- * Estrutura para entradas da estratégia 2
+ * Estrutura a ser armazenada no inicio do arquivo de indice
+ *      Ocupa a primeira pagina do arquivo de indice.
 */
 typedef struct{
-    int chave;
-    rid r;
-}entrada2;
-
-/**
- * Estrutura para entradas da estratégia 3
-*/
-typedef struct{
-    int chave;
-    int qtd; 
-        // a lista de rids é armazenada logo em sequência.
-}entrada3;
+    int qtdFolhas; // número de páginas no arquivo de dados (indica o numero da proxima folha a ser inserida)
+    int qtdNos; // numero de páginas no arquivo de indice (indica o numero do proximo nó a ser inserido)
+    int profundidade;
+    int noRaiz;
+}auxFile;
 
 // ================ Estruturas para nós ================ //
 
@@ -55,42 +58,10 @@ typedef struct{
 */
 typedef struct{
     bool filhosSaoFolha;
-    int ocupacao;
-    int pai;
+    int ocupacao; // a ocupacao for -1, o nó é inválido
+    int pai; // numero da pagina
 }noDisco; // ponteiros e chaves armazenados separadamente na página
 
-/**
- * Estrutura nó para manipulação em memória
-*/
-typedef struct noMemoria{
-    noDisco no;
-    void *conteudo;
-    bool noAlterado;
 
-    struct noMemoria *pai;
-    void **filhos;
-}noMemoria;
-
-// ================ Estruturas para folhas ================ //
-
-/**
- * Estrutura folha em disco
-*/
-typedef struct{
-    int ocupacao;
-    long long pai, ant, prox;
-}folhaDisco;
-
-/**
- *  Estrutura folha em memória
-*/
-typedef struct{
-    folhaDisco folha;
-    void *conteudo;
-    bool folhaAlterada;
-
-    noMemoria *pai;
-    folhaDisco *ant, *prox;
-}folhaMemoria;
 
 #endif
