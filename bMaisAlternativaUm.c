@@ -15,37 +15,91 @@ extern auxFile auxF;
 /**
  * inserirFolha
  * -------------
- * Entrada:
- * Processo:
- * Saída
+ * Entrada: inteiro, indicando o frame do bufferpool que a pagina a ser gravada no arquivo de dados está
+ *              A folha deve ter sido preenchida antes de ser passada
+ * Processo: Insere uma folha passado no final do arquivo de dados
+ * Saída: -1, em falha, número inteiro não negativo indicando o número da página, em sucesso
 */
-int inserirFolha()
+int inserirFolha(int frame)
 {
-    // recebe a pagina a ser inserida
-        // os registros precisam estar organizados na folha, assim como a estrutura dela com todos os campos preenchidos
+    if(frame < 0) // fazer a verificação no outro extremo
+        return -1;
 
-    // determina onde deve ser escrito, escreve, e retorna o numero da pagina
-    // incrementa a contagem de paginas na estrutura auxiliar
-    // deixar a pagina no bufferpool?
+	int pageID = auxF.qtdFolhas++; //obtém o pageID da pagina inserida e já incrementa o contador de folhas
 
+	lseek64(fd_Dados, 0, SEEK_END);
+	write(fd_Dados, obterConteudoFrame(b,frame) , PAGE_SIZE);
+
+	return pageID;
 }
 
 /**
  * removerFolha
  * -------------
- * Entrada:
- * Processo:
- * Saída
+ * Entrada: inteiro, indicando file descriptor
+ *          inteiro, indicando a página a ser removida
+ * Processo: Remove (invalida) a folha dada no arquivo dado. No processo atualiza os ponteiros dos vizinhos.
+ * Saída: 0, em falha, 1, em sucesso
 */
-int removerFolha()
+int removerFolha(int fd, int pageID)
 {
-    // recebe o numero da pagina a ser removida
-    // determina sua localização e invalida a pagina (-1 na ocupacao)
-        // antes de invalidar deve corrigir os ponteiros das folhas vizinhas
-            // a propria folha a ser removida possui o numero das paginas desses vizinhos
-        // não altera a estrutura auxiliar no arquivo de indice, a pagina simplesmente permanece invalidada
+    folhaDisco centralLeef;
+    int frameCentral = -1;
+    void *fc = NULL; 
 
-    // retorna sucesso ou fracasso
+    folhaDisco auxLeef;
+    void *f = NULL;
+
+    int frameEsquerdo = -1;
+    int frameDireito = -1;
+
+    if(fd == -1 || pageID < 0 || pageID >= auxF.qtdFolhas)
+        return 0;
+
+    frameCentral = carregarPagina(b,fd,pageID);
+    if(frameCentral == -1)
+        return 0;
+
+    fc = obterConteudoFrame(b,frameCentral);
+    memcpy(&centralLeef, fc + PAGE_SIZE - sizeof(folhaDisco), sizeof(folhaDisco)); // obtemos a estrutura folhaDisco da folha
+
+    if(centralLeef.ocupacao == -1)
+        return 0;
+    else
+        centralLeef.ocupacao = -1; // invalida a pagina, ela continua existindo no arquivo mas é ignorada. Com isso a estrutura auxliar não é atualizada
+
+    memcpy(fc + PAGE_SIZE - sizeof(folhaDisco), &centralLeef, sizeof(folhaDisco));
+
+    frameEsquerdo = carregarPagina(b,fd,centralLeef.ant);
+    frameDireito = carregarPagina(b,fd,centralLeef.prox);
+
+    if(frameEsquerdo != -1)
+    {
+        f = obterConteudoFrame(b,frameEsquerdo);
+        memcpy(&auxLeef, f + PAGE_SIZE - sizeof(folhaDisco), sizeof(folhaDisco));
+
+        auxLeef.prox = frameDireito;
+        memcpy(f + PAGE_SIZE - sizeof(folhaDisco), &auxLeef, sizeof(folhaDisco));
+    }
+
+    if(frameDireito != -1)
+    {
+        f = obterConteudoFrame(b,frameDireito);
+        memcpy(&auxLeef, f + PAGE_SIZE - sizeof(folhaDisco), sizeof(folhaDisco));
+    
+        auxLeef.ant = frameEsquerdo;
+        memcpy(f + PAGE_SIZE - sizeof(folhaDisco), &auxLeef, sizeof(folhaDisco));
+    }
+
+    persistirFrame(b,frameCentral);
+    persistirFrame(b,frameEsquerdo);
+    persistirFrame(b,frameDireito);
+
+    decrementarPinCount(b,frameCentral);
+    decrementarPinCount(b,frameEsquerdo);
+    decrementarPinCount(b,frameDireito);
+
+    return 1;
 }
 
 /**
@@ -88,7 +142,7 @@ int removerNo()
 */
 int buscaFolhaAltUm(int chave)
 {
-    int i = 0;
+    int prox = 0; // armazena o indice que indica o ponteiro para o proximo no ou folha
     int frame = -1; // armazena o número do frame que estamos manipulando
     noDisco noAtual; // armazena a struct referente ao nó atual
     folhaDisco folhaAtual; // armazena a struct referente à folha atual
@@ -97,7 +151,7 @@ int buscaFolhaAltUm(int chave)
     int *pontChaves = malloc(sizeof(int) * (2 * CHAVES_NO + 1)); // serve para armazenar as chaves e ponteiros de um nó
 
     frame = carregarPagina(b, fd_Indice, 0); // começa carregando a página do nó raiz
-    f = obterFrame(b,frame); // obtém o ponteiro para o conteúdo do nó raiz
+    f = obterConteudoFrame(b,frame); // obtém o ponteiro para o conteúdo do nó raiz
 
     do
     {
@@ -105,21 +159,19 @@ int buscaFolhaAltUm(int chave)
         qtd = noAtual.ocupacao;
         memcpy(pontChaves, f, sizeof(int) * (2 * qtd + 1)); // copia-se os ponteiros e chaves para fácil acesso
        
-        i = buscaBinariaNo(chave,pontChaves,0, 2 * qtd);
+        prox = buscaBinariaNo(chave,pontChaves,0, 2 * qtd);
 
         decrementarPinCount(b,frame); // libera o frame do nó atual (é colocado na pilha)
 
         if(noAtual.filhosSaoFolha) // o formato das folhas é diferente, sendo necessário outro tratamento
         {
-            frame = carregarPagina(b,fd_Dados, pontChaves[i]); // carrega para o bufferpool a folha correta
-            f = obterFrame(b,frame);
-
+            frame = carregarPagina(b,fd_Dados, pontChaves[prox]); // carrega para o bufferpool a folha correta
             break;
         }
         else
         {            
-            frame = carregarPagina(b,fd_Indice,pontChaves[i]); // carrega para o bufferpool o filho correto (um nó)
-            f = obterFrame(b, frame);
+            frame = carregarPagina(b,fd_Indice,pontChaves[prox]); // carrega para o bufferpool o filho correto (um nó)
+            f = obterConteudoFrame(b, frame);
         }
     }while(1);
 
@@ -230,7 +282,7 @@ int inserirAltUm(registro r)
     registro *entradas = malloc(sizeof(registro) * REG_FOLHA); // serve para armazenar os registros de uma folha
 
     int frameFolha = buscaFolhaAltUm(r.nseq);
-    f = obterFrame(b,frameFolha);
+    f = obterConteudoFrame(b,frameFolha);
     memcpy(&folhaAtual, f + PAGE_SIZE - sizeof(folhaDisco), sizeof(folhaDisco)); // obtemos a estrutura folhaDisco da folha
 
     if(folhaAtual.ocupacao == REG_FOLHA) // folha cheia
@@ -262,6 +314,11 @@ int inserirAltUm(registro r)
             }
             entradas[i] = r;
         }
+
+        folhaAtual.ocupacao++;
+
+        memcpy(f, entradas, sizeof(registro) * folhaAtual.ocupacao);
+        memcpy(f + PAGE_SIZE - sizeof(folhaDisco), &folhaAtual, sizeof(folhaDisco));
 
         persistirFrame(b,frameFolha);
     }
@@ -301,14 +358,14 @@ int redistribuicaoInsercao(registro r, int frame)
     folhaDisco folhaAtual; // estrutura de dados da folha atual
     
 
-    fA = obterFrame(b,frame);
+    fA = obterConteudoFrame(b,frame);
     memcpy(&folhaAtual, fA + PAGE_SIZE - sizeof(folhaDisco), sizeof(folhaDisco));
     memcpy(entradas,fA,folhaAtual.ocupacao * sizeof(folhaDisco));
 
     if(folhaAtual.ant != -1) // existir uma folha à esquerda
     {
         folhaIrma = carregarPagina(b, fd_Dados, folhaAtual.ant);
-        folhaAux = obterFrame(b, folhaIrma);
+        folhaAux = obterConteudoFrame(b, folhaIrma);
         memcpy(&folhaDiscoAux, folhaAux + PAGE_SIZE - sizeof(folhaDisco), sizeof(folhaDisco));
 
         // verifica se as folhas possuem o mesmo pai
@@ -332,7 +389,7 @@ int redistribuicaoInsercao(registro r, int frame)
 
                 // carrega o nó pai
                 noFrame = carregarPagina(b, fd_Indice, folhaAtual.pai);
-                noPai = obterFrame(b,noFrame);
+                noPai = obterConteudoFrame(b,noFrame);
                 memcpy(&pai, noPai + PAGE_SIZE - sizeof(noDisco), sizeof(noDisco)); // obtemos a estrutura noDisco do nó
                 memcpy(pontChaves, noPai, sizeof(int) * (2 * pai.ocupacao + 1)); // copia-se os ponteiros e chaves para fácil acesso                
 
@@ -362,7 +419,7 @@ int redistribuicaoInsercao(registro r, int frame)
     if(folhaAtual.prox != -1 && !redistribuicaoRealizada) // existir uma folha à direita
     {
         folhaIrma = carregarPagina(b, fd_Dados, folhaAtual.prox);
-        folhaAux = obterFrame(b, folhaIrma);
+        folhaAux = obterConteudoFrame(b, folhaIrma);
         memcpy(&folhaDiscoAux, folhaAux + PAGE_SIZE - sizeof(folhaDisco), sizeof(folhaDisco));
 
         // verifica se as folhas possuem o mesmo pai
@@ -386,7 +443,7 @@ int redistribuicaoInsercao(registro r, int frame)
 
                 // carrega o nó pai
                 noFrame = carregarPagina(b, fd_Indice, folhaAtual.pai);
-                noPai = obterFrame(b,noFrame);
+                noPai = obterConteudoFrame(b,noFrame);
                 memcpy(&pai, noPai + PAGE_SIZE - sizeof(noDisco), sizeof(noDisco)); // obtemos a estrutura noDisco do nó
                 memcpy(pontChaves, noPai, sizeof(int) * (2 * pai.ocupacao + 1)); // copia-se os ponteiros e chaves para fácil acesso                
 
@@ -447,14 +504,14 @@ int splitInsercao(registro r, int frame)
     folhaDisco folhaAtual; // estrutura de dados da folha atual
     
 
-    fA = obterFrame(b,frame);
+    fA = obterConteudoFrame(b,frame);
     memcpy(&folhaAtual, fA + PAGE_SIZE - sizeof(folhaDisco), sizeof(folhaDisco));
     memcpy(entradas,fA,folhaAtual.ocupacao * sizeof(folhaDisco));
 
     if(folhaAtual.ant != -1)
     {
         folhaIrma = carregarPagina(b, fd_Dados, folhaAtual.ant);
-        folhaAux = obterFrame(b, folhaIrma);
+        folhaAux = obterConteudoFrame(b, folhaIrma);
         memcpy(&folhaDiscoAux, folhaAux + PAGE_SIZE - sizeof(folhaDisco), sizeof(folhaDisco));
 
         // verifica se as folhas possuem o mesmo pai

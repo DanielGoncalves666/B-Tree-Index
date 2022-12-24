@@ -21,6 +21,7 @@
 #include"bufferpool.h"
 
 const double OCUPACAO = 0.5; // ocupação das folhas à princípio
+const int TAM_BUFFERPOOL = 100; // quantidade de frame do bufferpool
 
 // ================ Estruturas Gerais ================ //
 

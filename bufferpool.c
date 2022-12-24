@@ -227,7 +227,7 @@ int cortarPilha(bufferpool *b, int frame)
  * Entrada: ponteiro para estrutura bufferpool
  *          inteiro, indicando o file descriptor do arquivo
  *          inteiro, indicando a página
- * Processo: Verifica se a página do arquivo solicitado já está no bufferpool, carregando ela e substituindo um frame utilizando MRU caso não
+ * Processo: Verifica se a página do arquivo solicitado já está no bufferpool, carregando ela e substituindo um frame utilizando MRU, caso não
  *           seja o caso. 
  * Saída: -1, em falha, inteiro não negativo em sucesso, indicando o frame
 */
@@ -235,6 +235,9 @@ int carregarPagina(bufferpool *b, int fd, int pid)
 {
     pageID p = {fd,pid};
     pageID aux;
+
+    if(b == NULL || fd == -1 || pid == -1)
+        return -1;
 
     for(int i = 0; i < b->length; i++)
     {
@@ -247,18 +250,12 @@ int carregarPagina(bufferpool *b, int fd, int pid)
     }
 
     // a página não foi encontrada no bufferpool
-    int retorno = pop(b);
-    if(retorno == -1)
-        return -1; // não há espaço no bufferpool, aborta
-
-    if(b->bufferTable[retorno].dirty_bit)
-        persistirFrame(b, retorno);
+    int retorno = liberarFrame(b);
     
     lseek64(p.fd, p.pid * PAGE_SIZE, SEEK_SET);
     read(p.fd, b->frames[retorno], sizeof(PAGE_SIZE));
     b->pageTable[retorno].p = p;
 
-    desativarDirtyBit(b,retorno); // redundante
     incrementarPinCount(b,retorno); // se chegou até aqui então retorno tinha pin_count = 0
 
     cortarPilha(b,retorno);
@@ -267,14 +264,33 @@ int carregarPagina(bufferpool *b, int fd, int pid)
 }
 
 /**
- * obterFrame
+ * liberarFrame
+ * ----------------
+ * Entrada: nenhuma
+ * Processo: Faz pop na pilha do bufferpool, persistindo o frame obtido se necessário, liberando-o para outro uso.
+ * Saída: -1, em falha, inteiro não negativo indicando o frame livre, em sucesso
+*/
+int liberarFrame(bufferpool *b)
+{
+    int retorno = pop(b);
+    if(retorno == -1)
+        return -1; // não há espaço no bufferpool, aborta
+
+    if(b->bufferTable[retorno].dirty_bit)
+        persistirFrame(b, retorno);
+    
+    return retorno;
+}
+
+/**
+ * obterConteudoFrame
  * -----------
  * Entrada: ponteiro para estrutura bufferpool
- *          inteiro, indicando o frame que se quer obter
- * Processo: Acessa os frames do bufferpool e dá acesso ao frame especificado
+ *          inteiro, indicando o frame que se quer obter o conteudo
+ * Processo: Acessa os frames do bufferpool e retorna o conteúdo do frame indicado
  * Saída: ponteiro genérico
 */
-void *obterFrame(bufferpool *b, int i)
+void *obterConteudoFrame(bufferpool *b, int i)
 {
     return b->frames[i];
 }

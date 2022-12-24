@@ -17,7 +17,7 @@ auxFile auxF; // armazena as inforamções auxiliares do índice
     
 int main()
 {
-    b = criarBufferPool(100);
+    b = criarBufferPool(TAM_BUFFERPOOL);
     if(b == NULL)
     {
         fprintf(stderr, "\nNão foi possível criar o bufferpool\n");
