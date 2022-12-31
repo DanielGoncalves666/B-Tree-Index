@@ -10,11 +10,11 @@
 #include"arvoreBmais.h"
 #include"bufferpool.h"
 
-// Bibliotecas requeridas pelas system calls
+#define _LARGEFILE64_SOURCE    
 #include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 #include <unistd.h>
+
+extern const int PAGE_SIZE;
 
 // ===== Page Table Structures ===== //
 
@@ -59,6 +59,7 @@ struct bufferpool{
 int push(bufferpool *b, int frame);
 int pop(bufferpool *b);
 int cortarPilha(bufferpool *b, int frame);
+void incrementarPinCount(bufferpool *b, int i);
 
 // ===== Bufferpool Functions ===== //
 
@@ -266,7 +267,7 @@ int carregarPagina(bufferpool *b, int fd, int pid)
 /**
  * liberarFrame
  * ----------------
- * Entrada: nenhuma
+ * Entrada: ponteiro para estrutura bufferpool
  * Processo: Faz pop na pilha do bufferpool, persistindo o frame obtido se necessário, liberando-o para outro uso.
  * Saída: -1, em falha, inteiro não negativo indicando o frame livre, em sucesso
 */
@@ -278,19 +279,37 @@ int liberarFrame(bufferpool *b)
 
     if(b->bufferTable[retorno].dirty_bit)
         persistirFrame(b, retorno);
+
+    b->bufferTable[retorno].pin_count++; // incrementa o pin count
     
     return retorno;
 }
 
 /**
- * obterConteudoFrame
+ * atualizarPageTable
+ * -------------------
+ * Entrada: ponteiro para estrutura bufferpool
+ *          inteiro, indicando o frame
+ *          inteiro, indicando o file descriptor do arquivo
+ *          inteiro, indicando a página
+ * Processo: Atualiza o pageID do frame indicado
+ * Saída: nenhuma
+*/
+void atualizarPageTable(bufferpool *b, int frame, int fd, int pid)
+{
+    b->pageTable[frame].p.fd = fd;
+    b->pageTable[frame].p.pid = pid;    
+}
+
+/**
+ * obterAcessoFrame
  * -----------
  * Entrada: ponteiro para estrutura bufferpool
  *          inteiro, indicando o frame que se quer obter o conteudo
  * Processo: Acessa os frames do bufferpool e retorna o conteúdo do frame indicado
  * Saída: ponteiro genérico
 */
-void *obterConteudoFrame(bufferpool *b, int i)
+void *obterAcessoFrame(bufferpool *b, int i)
 {
     return b->frames[i];
 }
@@ -349,6 +368,9 @@ void incrementarPinCount(bufferpool *b, int i)
 void decrementarPinCount(bufferpool *b, int i)
 {
     // o decremento é de responsabilidade do usuário
+    if(b->bufferTable[i].pin_count == 0)
+        return;
+
     int aux = --(b->bufferTable[i].pin_count);
     if(aux == 0)
         push(b,i);

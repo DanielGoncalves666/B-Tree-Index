@@ -7,13 +7,20 @@
 #include<stdio.h>
 #include"arvoreBmais.h"
 #include"bMaisAlternativaUm.h"
+#include"bufferpool.h"
+
+#define _LARGEFILE64_SOURCE   // para usar lseek64
+#include <sys/types.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+extern const int REG_FOLHA;
 
 int fd_Dados = -1; // armazena o file descriptor do arquivo que contém os dados 
 int fd_Indice = -1; // armazena o file descriptor do arquivo que contém o índice
-//int fd_Indice_Aux = -1; // armazena o file descript do arquivo que contém informações auxiliares sobre o índice
 bufferpool *b = NULL; // armazena o ponteiro para o bufferpool
-auxFile auxF; // armazena as inforamções auxiliares do índice
-    // ocupa a primeira pagina do arquivo
+auxFile auxF; // armazena as inforamções auxiliares do índice (ocupa a primeira pagina do arquivo)
     
 int main()
 {
@@ -167,6 +174,7 @@ int converterArquivo()
             f.ant = cont == 0 ? -1 : cont - 1;
             f.prox = (bytesLidos / sizeof(registro)) < sizeof(registro) * qtd ? -1 : cont + 1;
             f.pai = -1;
+            f.self = cont;
             memcpy(bufferEscrita + (PAGE_SIZE - sizeof(folhaDisco)), &f, sizeof(folhaDisco)); // estrutura que armazena informações da folha
 
             write(fd_Temp, bufferEscrita, PAGE_SIZE);

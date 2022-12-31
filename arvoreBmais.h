@@ -7,19 +7,11 @@
 #ifndef __ARVORE_B_MAIS_H
 #define __ARVORE_B_MAIS_H
 
-#define _LARGEFILE64_SOURCE   // para usar lseek64
-
-// Bibliotecas requeridas pelas system calls
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-
 #include<stdlib.h>
 #include<string.h>
 #include<stdbool.h>
-#include"bufferpool.h"
 
+const int PAGE_SIZE = 512; // tamanho de uma página em bytes
 const double OCUPACAO = 0.5; // ocupação das folhas à princípio
 const int TAM_BUFFERPOOL = 100; // quantidade de frame do bufferpool
 
@@ -64,5 +56,10 @@ typedef struct{
 }noDisco; // ponteiros e chaves armazenados separadamente na página
 
 
+int converterArquivo();
+int loadAuxInfo();
+int writeAuxInfo(int fd, auxFile info);
+int abrirArquivos(int tipo, char nome[31]);
+void menuOperacoes();
 
 #endif
