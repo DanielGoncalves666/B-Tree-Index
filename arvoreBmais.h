@@ -51,6 +51,7 @@ typedef struct{
 */
 typedef struct{
     bool filhosSaoFolha;
+    int self;
     int ocupacao; // a ocupacao for -1, o nó é inválido
     int pai; // numero da pagina
 }noDisco; // ponteiros e chaves armazenados separadamente na página

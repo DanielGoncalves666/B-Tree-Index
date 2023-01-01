@@ -11,7 +11,7 @@ int carregarPagina(bufferpool *b, int fd, int pid);
 int liberarFrame(bufferpool *b);
 void atualizarPageTable(bufferpool *b, int frame, int fd, int pid);
 void *obterAcessoFrame(bufferpool *b, int i);
-void ativarDirtyBit(bufferpool *b, int i);
+void ativarDirtyBit(bufferpool *b, int i); // PRECISA ATIVAR O DIRTY_BIT QUANDO NECESSARIO
 void desativarDirtyBit(bufferpool *b, int i);
 void decrementarPinCount(bufferpool *b, int i);
 // o incremento do pin count é de responsabilidade da função carregarPagina

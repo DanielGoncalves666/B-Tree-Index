@@ -20,6 +20,7 @@ int buscaFolhaAltUm(int chave);
 
 int buscaBinariaFolha(int chave, registro *entradas, int e, int d);
 int buscaBinariaNo(int chave, int *vetor, int e, int d);
+int buscaBinariaNoPonteiro(int ponteiro, int *vetor, int e, int d);
 
 int inserirAltUm(registro r);
 
@@ -33,6 +34,12 @@ void gravarNoDisco(int frame, noDisco n);
 int obterPrimeiraChaveFolha(int frame, int *primeiraChave);
 int obterUltimaChaveFolha(int frame, int *ultimaChave);
 
+void atualizarPai(int pont, bool folha, int novoPai);
+int atualizarPonteiroNo(int frame, int oldPont, int newPont);
+
+int obterPonteiroNo(int frame, int which);
+int obterChaveNo(int frame, int which);
+
 int atualizarEntradaNo(int frame, int ponteiro, int chaveNova);
 int adicionarEntradaNo(int frame, int ponteiro, int chave);
 int removerEntradaNo(int frame, int ponteiro);
@@ -43,5 +50,9 @@ int removerOrdenadoFolha(int frame, int chave, int flag, registro *r);
 int redistribuicaoInsercaoFolha(int frame, registro r);
 int splitInsercaoFolha(int frame, registro r);
 
+int redistribuicaoInsercaoNo(int frame, int ponteiro, int chave);
+
+int obterNoIrmao(int frame, int ponteiro, int which);
+int obterChaveReferenteNo(int framePai, int ponteiro, int *chave);
 
 #endif
