@@ -4,10 +4,13 @@
     by Daniel Gonçalves 2022
 */
 
-#include<stdio.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include"arvoreBmais.h"
-#include"bMaisAlternativaUm.h"
 #include"bufferpool.h"
+#include"operacoesFolha.h"
 
 #define _LARGEFILE64_SOURCE   // para usar lseek64
 #include <sys/types.h>

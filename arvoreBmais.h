@@ -7,9 +7,7 @@
 #ifndef __ARVORE_B_MAIS_H
 #define __ARVORE_B_MAIS_H
 
-#include<stdlib.h>
-#include<string.h>
-#include<stdbool.h>
+#include <stdbool.h>
 
 const int PAGE_SIZE = 512; // tamanho de uma página em bytes
 const double OCUPACAO = 0.5; // ocupação das folhas à princípio
@@ -43,19 +41,6 @@ typedef struct{
     int profundidade;
     int noRaiz;
 }auxFile;
-
-// ================ Estruturas para nós ================ //
-
-/**
- * Estrutura nó para armazenamento em disco
-*/
-typedef struct{
-    bool filhosSaoFolha;
-    int self;
-    int ocupacao; // a ocupacao for -1, o nó é inválido
-    int pai; // numero da pagina
-}noDisco; // ponteiros e chaves armazenados separadamente na página
-
 
 int converterArquivo();
 int loadAuxInfo();
