@@ -42,9 +42,6 @@ typedef struct{
     int noRaiz;
 }auxFile;
 
-int converterArquivo();
-int loadAuxInfo();
-int writeAuxInfo(int fd, auxFile info);
 int abrirArquivos(int tipo, char nome[31]);
 void menuOperacoes();
 

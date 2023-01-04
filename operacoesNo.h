@@ -25,6 +25,7 @@ void gravarNoDisco(int frame, noDisco n);
 
 void atualizarPai(int pont, bool folha, int novoPai);
 int atualizarPonteiroNo(int frame, int oldPont, int newPont);
+int atualizarPonteiroPosicaoNo(int frame, int pos, int newPont);
 
 int obterPonteiroNo(int frame, int which);
 int obterChaveNo(int frame, int which);

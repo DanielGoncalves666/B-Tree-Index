@@ -198,6 +198,34 @@ int atualizarPonteiroNo(int frame, int oldPont, int newPont)
 }
 
 /**
+ * atualizarPonteiroPosicaoNo
+ * --------------------
+ * Entrada: inteiro, indicando o frame em que está o nó
+ *          inteiro, indicando a posição do ponteiro a ser atualizado
+ *          inteiro, indicando o novo valor para o ponteiro
+ * Processo: Atualiza o ponteiro ma posição indicada.
+ * Saída: 0, em falha, 1, em sucesso
+*/
+int atualizarPonteiroPosicaoNo(int frame, int pos, int newPont)
+{
+    if(frame == -1)
+        return 0;
+
+    void *n = NULL; // ponteiro para o conteúdo do nó
+    noDisco no; // estrutura de dados do nó
+
+    n = obterAcessoFrame(b,frame);
+    carregarNoDisco(frame,&no);
+
+    if(no.ocupacao * 2 < pos )
+        return 0;
+
+    memcpy(n, &newPont, sizeof(int) * (pos * 2));
+
+    return 1;
+}
+
+/**
  * obterPondeiroNo
  * ---------------
  * Entrada: inteiro, indicando o frame onde o nó está carregado
@@ -413,7 +441,7 @@ int adicionarEntradaNo(int frame, int ponteiro, int chave)
     if(pai.ocupacao == CHAVES_NO)
         return -1;
 
-    for(i = (pai.ocupacao * 2) - 1; i >= 1; i -= 2)
+    for(i = (pai.ocupacao * 2) -1; i >= 1; i -= 2)
     {
         if(pontChaves[i] == chave)
         {
@@ -658,13 +686,13 @@ int redistribuicaoInsercaoNo(int frame, int ponteiro, int chave)
  * Entrada: inteiro, indicando o frame do nó cheio
  *          inteiro, indicando o ponteiro a ser adicionado
  *          inteiro, indicando a chave a ser adicionada
- * Processo: 
- * Saida: 0, em falha, 1, em sucesso
+ * Processo:  Realiza o split do nó em questao.
+ * Saida: -1, em falha, inteiro não negativo indicando o novo nó criado (desconsiderando splits acima), em sucesso
 */
 int splitInsercaoNo(int frame, int ponteiro, int chave)
 {
     if(frame == -1)
-        return 0;
+        return -1;
 
     int i;
 
@@ -678,7 +706,7 @@ int splitInsercaoNo(int frame, int ponteiro, int chave)
     frameNovo = liberarFrame(b);
     void *n = obterAcessoFrame(b,frameNovo);
     if(frameNovo == -1)
-        return 0;
+        return -1;
 
     // preenche informações da estrutura, menos o .self
     noNovo.pai = atual.pai;
@@ -788,5 +816,5 @@ int splitInsercaoNo(int frame, int ponteiro, int chave)
 
     free(pontChaves);
 
-    return 1;
+    return frameNovo;
 }

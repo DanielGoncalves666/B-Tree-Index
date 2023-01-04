@@ -6,5 +6,8 @@ int inserirFolha(int frame);
 int removerFolha(int fd, int pageID);
 int inserirNo(int frame);
 int removerNo(int fd, int pageID);
+int converterArquivo();
+int loadAuxInfo();
+int writeAuxInfo(int fd, auxFile info);
 
 #endif

@@ -11,12 +11,13 @@
 #include"arvoreBmais.h"
 #include"bufferpool.h"
 #include"operacoesFolha.h"
+#include"operacoesArquivos.h"
 
 #define _LARGEFILE64_SOURCE   // para usar lseek64
-#include <sys/types.h>
-#include <unistd.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 extern const int REG_FOLHA;
 
@@ -140,87 +141,6 @@ int main()
     desalocarBufferPool(b);
 
     return 0;
-}
-
-/**
- * converterArquivo
- * -------------------
- * Entrada: inteiro, indicando o file descriptor do arquivo de dados
- * Processo: converte um arquivo de dados, contendo registros justapostos, em um arquivo separado por páginas com 
- *           ocupacao especificado por OCUPACAO
- * Saída: -2, para arquivo já convertido, -1, para falha na criação de arquivo temporário, ou um inteiro não 
- *            negativo, indicando o file descritor do arquivo criado
-*/
-int converterArquivo()
-{
-    folhaDisco f;
-
-    int fd_Temp = open("temp.txt", O_CREAT | O_RDWR | O_TRUNC | __O_LARGEFILE, S_IRWXU | S_IRWXO);
-    if(fd_Temp != -1)
-    {
-        int bytesLidos = 0;
-        int qtd = OCUPACAO * REG_FOLHA; // quantidade de registros em cada folha
-    
-        void *bufferLeitura = malloc(sizeof(registro) * qtd);
-        void *bufferEscrita = malloc(PAGE_SIZE);
-
-        lseek(fd_Dados, 0, SEEK_SET);
-        lseek(fd_Temp, 0, SEEK_SET);
-
-        int cont = 0;
-        while( (bytesLidos = read(fd_Dados, bufferLeitura, sizeof(registro) * qtd)) != 0)
-        {
-            // entradas
-            memcpy(bufferEscrita, bufferLeitura, sizeof(registro) * (bytesLidos / sizeof(registro)));
-
-            f.ocupacao = bytesLidos/ sizeof(registro);
-            f.ant = cont == 0 ? -1 : cont - 1;
-            f.prox = (bytesLidos / sizeof(registro)) < sizeof(registro) * qtd ? -1 : cont + 1;
-            f.pai = -1;
-            f.self = cont;
-            memcpy(bufferEscrita + (PAGE_SIZE - sizeof(folhaDisco)), &f, sizeof(folhaDisco)); // estrutura que armazena informações da folha
-
-            write(fd_Temp, bufferEscrita, PAGE_SIZE);
-        }
-
-        close(fd_Dados);
-    }
-
-    return fd_Temp;
-}
-
-/**
- * loadAuxInfo
- * ------------
- * Entrada: nenhuma
- * Processo: Carrega as informações auxiliares do arquivo de indice aberto no momento
- * Saída: 0, em falha, 1, em sucesso
-*/
-int loadAuxInfo()
-{
-    if(fd_Indice == -1)
-        return 0;
-
-    lseek64(fd_Indice, 0, SEEK_SET);
-    read(fd_Indice, &auxF, sizeof(auxFile));
-
-    return 1;
-}
-
-/**
- * writeAuxInfo
- * -------------
- * Entrada: estrutura do tipo auxFile
- * Processo: Grava a estrutura de informações auxiliares passada no arquivo cujo file descriptor foi passado
- * Saída: 0, em fracasso, 1, em sucesso
-*/
-int writeAuxInfo(int fd, auxFile info)
-{
-    if(fd == -1)
-        return 0;
-
-    lseek64(fd,0,SEEK_SET);
-    write(fd,&auxF,sizeof(auxFile));
 }
 
 /**
